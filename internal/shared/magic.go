@@ -1,0 +1,3 @@
+package shared
+
+var MagicBytes = []byte{0xFA, 0xCE, 0xAF}

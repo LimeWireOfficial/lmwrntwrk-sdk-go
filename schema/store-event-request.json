@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.com/store-event-request.schema.json",
+  "title": "StoreEventRequest",
+  "description": "Schema for StoreEventRequest with nested Request and Footer objects",
+  "type": "object",
+  "properties": {
+    "storageProviderS3Signature": {
+      "type": "string",
+      "description": "Base64 encoded signature of the `x-lmwrntwrk-signature` field. Signed by one of the ApiKeys of the StorageProvider"
+    },
+    "request": {
+      "$ref": "#/$defs/Request",
+      "description": "Request that was sent by the SDK to the MinIO Extension"
+    },
+    "response": {
+      "$ref": "#/$defs/Response",
+      "description": "Response that MinIO itself returns to the MinIO Extension"
+    },
+    "storageProviderPayload": {
+      "type": "string",
+      "description": "Additional fields that are additionally added by the MinIO Extension, which are not part of the default response of MinIO"
+    },
+    "footer": {
+      "$ref": "#/$defs/Footer",
+      "description": "Additional meta data about the uploaded binary."
+    }
+  },
+  "required": [
+    "storageProviderS3Signature",
+    "request",
+    "response",
+    "storageProviderPayload"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "Request": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "type": "string",
+          "description": "HTTP method (GET, POST, PUT, DELETE, etc.)"
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Request URL"
+        },
+        "body": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "description": "Request body as base64-encoded bytes"
+        },
+        "headers": {
+          "$ref": "#/$defs/Headers"
+        }
+      },
+      "required": [
+        "method",
+        "url",
+        "headers"
+      ],
+      "additionalProperties": false
+    },
+    "Response": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "body": {
+          "type": "string",
+          "description": "Response body as plain text, or base64-encoded bytes"
+        },
+        "headers": {
+          "$ref": "#/$defs/Headers"
+        }
+      }
+    },
+    "StorageProviderPayload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "versions": {
+          "type": "array",
+          "description": "Array of version strings for PUT requests",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "Footer": {
+      "type": "object",
+      "properties": {
+        "clientSignature": {
+          "type": "string",
+          "description": "Signature created based on the binary data. Contains an incremental SHA256 hash of the given hash list and the file size. Signed by an ApiKey of the Account"
+        },
+        "storageProviderSignature": {
+          "type": "string",
+          "description": "Base64 encoded signature of the `clientSignature` field. Signed by one of the ApiKeys of the StorageProvider"
+        },
+        "hashes": {
+          "type": "array",
+          "description": "Individual hashes of slices of the binary data. Each hash is a tuple of the SHA256 hash and the amount of bytes that were hashed",
+          "items": {
+            "$ref": "#/$defs/HashTuple"
+          }
+        },
+        "fileSize": {
+          "type": "integer",
+          "format": "int64",
+          "description": "Size of the binary in bytes"
+        }
+      },
+      "required": [
+        "clientSignature",
+        "storageProviderSignature",
+        "hashes",
+        "fileSize"
+      ],
+      "additionalProperties": false
+    },
+    "Headers": {
+      "type": "object",
+      "description": "HTTP headers as key-value pairs",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "HashTuple": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}
