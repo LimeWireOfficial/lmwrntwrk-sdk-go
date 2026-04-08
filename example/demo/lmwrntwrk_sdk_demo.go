@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/client"
-	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/graph"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -18,17 +17,17 @@ import (
 )
 
 func main() {
-	// Read the base64 private key from the environment variable
-	base64PrivateKey := os.Getenv("DEMO_LMWRNTWRK_PRIVATE_KEY_BASE64")
-	if base64PrivateKey == "" {
-		log.Fatalf("Environment variable DEMO_LMWRNTWRK_PRIVATE_KEY_BASE64 is not set")
+	// 1. Base config data
+	privateKey := os.Getenv("DEMO_LMWRNTWRK_PRIVATE_KEY")
+	if privateKey == "" {
+		log.Fatalf("Environment variable DEMO_LMWRNTWRK_PRIVATE_KEY is not set")
 	}
 	bucketName := os.Getenv("DEMO_LMWRNTWRK_DESTINATION_BUCKET")
 	if bucketName == "" {
 		log.Fatalf("Environment variable DEMO_LMWRNTWRK_DESTINATION_BUCKET is not set")
 	}
 	limeWireNetworkClientConfig := client.Config{
-		PrivateKey: base64PrivateKey,
+		PrivateKey: privateKey,
 	}
 	accessKey := client.GenerateAccessKey(limeWireNetworkClientConfig)
 	secretKey := client.GenerateSecretKey(limeWireNetworkClientConfig)
@@ -51,11 +50,7 @@ func main() {
 	}
 
 	// 4. Create an S3 client with a custom endpoint resolver
-	graphURL := os.Getenv("DEMO_LMWRNTWRK_GRAPH_URL")
-	spResolver := client.NewStorageProviderResolver(
-		graph.NewGraphQLClient(graphURL, "", nil),
-		time.Second*10,
-	)
+	spResolver := client.DefaultProviderResolver()
 
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
 		o.UsePathStyle = true

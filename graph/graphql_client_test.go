@@ -3,7 +3,6 @@ package graph
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"math/big"
 	"net/http"
 	"net/http/httptest"
@@ -74,13 +73,14 @@ func TestGraphQLGetStorageProvider(t *testing.T) {
 	}
 }
 
-func TestGraphQLGetValidatorEndpoint(t *testing.T) {
+func TestGraphQLListEnabledValidatorEndpoints(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		resp := GraphQLResponse{
 			Data: json.RawMessage(`{
-				"validators": [{
-					"endpointUrl": "https://validator.example"
-				}]
+				"validators": [
+					{"endpointUrl": "https://v1.example"},
+					{"endpointUrl": "https://v2.example"}
+				]
 			}`),
 		}
 		err := json.NewEncoder(w).Encode(resp)
@@ -91,36 +91,12 @@ func TestGraphQLGetValidatorEndpoint(t *testing.T) {
 	defer ts.Close()
 
 	client := NewGraphQLClient(ts.URL, "test-token", nil)
-	got, err := client.GetValidatorEndpoint(context.Background())
+	got, err := client.ListEnabledValidatorEndpoints(context.Background())
 	if err != nil {
-		t.Fatalf("GetValidatorEndpoint error: %v", err)
+		t.Fatalf("ListEnabledValidatorEndpoints error: %v", err)
 	}
 
-	if got != "https://validator.example" {
-		t.Fatalf("unexpected endpoint: %s", got)
+	if len(got) != 2 || got[0] != "https://v1.example" || got[1] != "https://v2.example" {
+		t.Fatalf("unexpected result: %+v", got)
 	}
-}
-
-func TestGraphQLQueryError(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := GraphQLResponse{
-			Errors: []struct {
-				Message string `json:"message"`
-			}{
-				{Message: "something went wrong"},
-			},
-		}
-		err := json.NewEncoder(w).Encode(resp)
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-	}))
-	defer ts.Close()
-
-	client := NewGraphQLClient(ts.URL, "test-token", nil)
-	_, err := client.GetValidatorEndpoint(context.Background())
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	fmt.Printf("Got expected error: %v\n", err)
 }

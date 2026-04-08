@@ -24,3 +24,8 @@ type BucketDetails struct {
 type BucketDetailsGetter interface {
 	GetBucketDetails(ctx context.Context, bucket string) (*BucketDetails, error)
 }
+
+// ValidatorEndpointsGetter is the interface for getting validator endpoints.
+type ValidatorEndpointsGetter interface {
+	ListEnabledValidatorEndpoints(ctx context.Context) ([]string, error)
+}

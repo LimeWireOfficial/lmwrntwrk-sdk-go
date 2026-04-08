@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/allowlist"
+	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/graph"
 	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/internal/shared"
 	"github.com/oklog/ulid/v2"
 )
@@ -59,6 +60,8 @@ type Config struct {
 	PrivateKeyFile       string // path to a private key file in any supported format
 	ChunkSize            int    // size of chunks for building a hash list in the footer, default: 4096
 	ValidatorUrlResolver ValidatorUrlResolver
+	GraphQLURL           string
+	GraphQLBearer        string
 }
 
 func StaticValidatorUrlResolver(urls ...string) ValidatorUrlResolver {
@@ -70,6 +73,10 @@ func StaticValidatorUrlResolver(urls ...string) ValidatorUrlResolver {
 		randomIndex := rand.Intn(len(urls))
 		return urls[randomIndex], nil
 	}
+}
+
+func DefaultValidatorUrlResolver(client graph.ValidatorEndpointsGetter, ttl time.Duration) ValidatorUrlResolver {
+	return NewCachingValidatorResolver(client, ttl)
 }
 
 type eCDSARoundTripper struct {
@@ -119,11 +126,18 @@ func newECDSARoundTripper(cfg Config) (*eCDSARoundTripper, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	validatorUrlResolver := cfg.ValidatorUrlResolver
+	if validatorUrlResolver == nil {
+		graphQLClient := graph.NewGraphQLClient(cfg.GraphQLURL, cfg.GraphQLBearer, nil)
+		validatorUrlResolver = DefaultValidatorUrlResolver(graphQLClient, 1*time.Minute)
+	}
+
 	return &eCDSARoundTripper{
 		Transport:            http.DefaultTransport,
 		signer:               signer,
 		ChunkSize:            cfg.ChunkSize,
-		ValidatorUrlResolver: cfg.ValidatorUrlResolver,
+		ValidatorUrlResolver: validatorUrlResolver,
 	}, nil
 }
 

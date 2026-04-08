@@ -38,8 +38,12 @@ type endpoint struct {
 func (e endpoint) valid() bool { return e.scheme != "" && e.host != "" }
 
 // NewStorageProviderResolver creates a resolver with a pre-initialized cache.
+// If client is nil, a default GraphQLClient is used.
 // If ttl <= 0, a default of 1 minute is used.
 func NewStorageProviderResolver(client graph.BucketDetailsGetter, ttl time.Duration) StorageProviderResolver {
+	if client == nil {
+		client = graph.DefaultGraphQLClient()
+	}
 	if ttl <= 0 {
 		ttl = time.Minute
 	}
@@ -50,6 +54,10 @@ func NewStorageProviderResolver(client graph.BucketDetailsGetter, ttl time.Durat
 	}
 	r.cache = ttlcache.New[string, endpoint](ttlcache.WithTTL[string, endpoint](ttl))
 	return r
+}
+
+func DefaultProviderResolver() StorageProviderResolver {
+	return NewStorageProviderResolver(nil, 0)
 }
 
 // ResolveEndpoint returns the tuple (scheme, host, error) based on the bucket name using blockchain.

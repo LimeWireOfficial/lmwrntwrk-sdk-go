@@ -12,6 +12,10 @@ import (
 	"time"
 )
 
+const DefaultGraphEndpoint = "https://graph.limewire.network/subgraphs/name/lmwrntwrk-v1"
+
+//const DefaultGraphEndpoint = "http://graph-node-admin.localhost:8000/subgraphs/name/bn-test-1"
+
 // GraphQLRequest defines the request structure for the GraphQL endpoint.
 type GraphQLRequest struct {
 	Query     string                 `json:"query"`
@@ -59,6 +63,9 @@ type GraphQLClient struct {
 
 // NewGraphQLClient creates a new GraphQL client.
 func NewGraphQLClient(url string, bearer string, httpClient *http.Client) *GraphQLClient {
+	if url == "" {
+		url = DefaultGraphEndpoint
+	}
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 30 * time.Second}
 	}
@@ -67,6 +74,11 @@ func NewGraphQLClient(url string, bearer string, httpClient *http.Client) *Graph
 		Bearer:     bearer,
 		HTTPClient: httpClient,
 	}
+}
+
+// DefaultGraphQLClient creates a GraphQL client using the package defaults.
+func DefaultGraphQLClient() *GraphQLClient {
+	return NewGraphQLClient("", "", nil)
 }
 
 func (c *GraphQLClient) query(ctx context.Context, query string, variables map[string]interface{}, result any) error {
@@ -203,11 +215,11 @@ func (c *GraphQLClient) GetStorageProvider(ctx context.Context, providerID uint3
 	}, nil
 }
 
-// GetValidatorEndpoint retrieves the validator endpoint via GraphQL.
-func (c *GraphQLClient) GetValidatorEndpoint(ctx context.Context) (string, error) {
+// GetEnabledValidatorEndpoints retrieves all enabled validator endpoints via GraphQL.
+func (c *GraphQLClient) ListEnabledValidatorEndpoints(ctx context.Context) ([]string, error) {
 	query := `
 		query GetValidators {
-			validators(first: 1, where: {status: "1"}) {
+			validators(first: 3, where: {status: ENABLED}) {
 				endpointUrl
 			}
 		}
@@ -219,12 +231,17 @@ func (c *GraphQLClient) GetValidatorEndpoint(ctx context.Context) (string, error
 
 	err := c.query(ctx, query, nil, &result)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if len(result.Validators) == 0 {
-		return "", fmt.Errorf("no active validator found")
+		return nil, fmt.Errorf("no active validator found")
 	}
 
-	return result.Validators[0].EndpointUrl, nil
+	endpoints := make([]string, len(result.Validators))
+	for i, validator := range result.Validators {
+		endpoints[i] = validator.EndpointUrl
+	}
+
+	return endpoints, nil
 }
