@@ -40,9 +40,9 @@ func (c *EndpointResolver) ResolveEndpoint(ctx context.Context, params s3.Endpoi
 		if scheme != "" && host != "" {
 			ep.URI.Scheme = scheme
 			ep.URI.Host = host
-			// log.Printf("Resolved endpoint for bucket '%s': %s://%s", bucketName, scheme, host)
+			//log.Printf("Resolved LimeWire Network endpoint for bucket '%s': %s://%s", bucketName, scheme, host)
 		} else {
-			// log.Printf("No specific endpoint resolved for bucket '%s', using default: %s", bucketName, ep.URI.String())
+			//log.Printf("No specific LimeWire Network endpoint resolved for bucket '%s', using default AWS endpoint: %s", bucketName, ep.URI.String())
 		}
 	}
 

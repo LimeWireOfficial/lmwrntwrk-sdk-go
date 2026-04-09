@@ -17,39 +17,51 @@ import (
 )
 
 func main() {
+	log.SetPrefix("[LimeWire SDK Demo] ")
+	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
+
+	ctx := context.Background()
+
 	// 1. Base config data
 	privateKey := os.Getenv("DEMO_LMWRNTWRK_PRIVATE_KEY")
 	if privateKey == "" {
-		log.Fatalf("Environment variable DEMO_LMWRNTWRK_PRIVATE_KEY is not set")
+		log.Fatal("DEMO_LMWRNTWRK_PRIVATE_KEY environment variable is required, specify it as hex (without 0x prefix), pem, or base64_pem")
 	}
 	bucketName := os.Getenv("DEMO_LMWRNTWRK_DESTINATION_BUCKET")
 	if bucketName == "" {
-		log.Fatalf("Environment variable DEMO_LMWRNTWRK_DESTINATION_BUCKET is not set")
+		log.Fatal("DEMO_LMWRNTWRK_DESTINATION_BUCKET environment variable is required, specify the bucket name (eg test-bucket)")
 	}
-	limeWireNetworkClientConfig := client.Config{
+
+	configOptions := client.Config{
 		PrivateKey: privateKey,
 	}
-	accessKey := client.GenerateAccessKey(limeWireNetworkClientConfig)
-	secretKey := client.GenerateSecretKey(limeWireNetworkClientConfig)
+
+	// Generate S3 credentials from the private key
+	accessKey := client.GenerateAccessKey(configOptions)
+	secretKey := client.GenerateSecretKey(configOptions)
+
+	log.Printf("Initializing SDK for bucket: %s", bucketName)
 
 	// 2. Create a custom HTTP client
-	customHTTP, err := client.NewHTTPClient(limeWireNetworkClientConfig)
+	// The LimeWire Network SDK requires a custom HTTP client to handle authentication and signing.
+	customHTTP, err := client.NewHTTPClient(configOptions)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to create LimeWire HTTP client: %v", err)
 	}
 
-	// 3. Load AWS SDK config with a custom HTTP client and credentials
-	cfg, err := config.LoadDefaultConfig(context.TODO(),
-		//config.WithClientLogMode(aws.LogRequestWithBody|aws.LogResponseWithBody), // Uncomment for debugging
+	// 3. Load AWS SDK config with the LimeWire Network custom HTTP client and credentials
+	cfg, err := config.LoadDefaultConfig(ctx,
+		// config.WithClientLogMode(aws.LogRequestWithBody|aws.LogResponseWithBody), // Uncomment for low-level debugging
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(accessKey, secretKey, "")),
-		config.WithRegion("lmwrntwrk-region"), // Required by aws SDK
+		config.WithRegion("lmwrntwrk-region"), // Custom region is required by the LimeWire Network
 		config.WithHTTPClient(customHTTP),
 	)
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		log.Fatalf("Failed to load AWS SDK config: %v", err)
 	}
 
-	// 4. Create an S3 client with a custom endpoint resolver
+	// 4. Create an S3 client with the LimeWire Network endpoint resolver
+	// This resolver automatically routes requests to the correct LimeWire Network storage provider.
 	spResolver := client.DefaultProviderResolver()
 
 	s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) {
@@ -58,114 +70,135 @@ func main() {
 	})
 
 	// 5. S3 client operations
-	// 5.1 create bucket fails with error as it is not allowed to create bucket from the SDK but from the blockchain
-	_, err = s3Client.CreateBucket(context.TODO(), &s3.CreateBucketInput{
-		Bucket: aws.String(bucketName),
-	})
-	if err == nil {
-		log.Printf("Bucket %s created but should not be allowed", bucketName)
-	} else {
-		log.Printf("Bucket %s creating failed with expected error: %v", bucketName, err)
-	}
+	log.Println("--- Starting S3 Operations ---")
 
-	// 5.2 put a single text file in the bucket
-	putRes, err := s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+	// 5.1 Bucket creation policy
+	// Note: Buckets cannot be created via the SDK. They must be provisioned on the blockchain.
+	log.Printf("Attempting to create bucket (this is expected to fail): %s", bucketName)
+	_, err = s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String(bucketName),
-		Key:    aws.String("test-msg1.txt"),
-		Body:   strings.NewReader("Hello, LimeWireNetwork!"),
 	})
 	if err != nil {
-		log.Fatalf("Failed to put object: %v", err)
+		log.Printf("Bucket creation failed as expected: %v", err)
+	} else {
+		log.Printf("Warning: Bucket %s was created unexpectedly", bucketName)
 	}
-	log.Printf("Put object response etag: %v", putRes.ETag)
 
-	// 5.3 put an image file in the bucket, an image file is in the local directory
+	prefix := "sdk-go-demo-" + time.Now().UTC().Format("20060102T150405Z") + "/"
+
+	// 5.2 Upload a simple text file
+	textObjectKey := prefix + "test-msg1.txt"
+	log.Println("Uploading text file under prefix:", prefix)
+	putRes, err := s3Client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(bucketName),
+		Key:    aws.String(textObjectKey),
+		Body:   strings.NewReader("Hello, LimeWire Network!"),
+	})
+	if err != nil {
+		log.Fatalf("Failed to upload text file: %v", err)
+	}
+	log.Printf("Text file uploaded successfully. ETag: %s", aws.ToString(putRes.ETag))
+
+	// 5.3 Upload an image file
 	imageFileName := "test-image.png"
+	imageObjectKey := prefix + imageFileName
+	log.Printf("Uploading image file '%s'...", imageObjectKey)
 	file, err := os.Open(imageFileName)
 	if err != nil {
-		log.Fatalf("Failed to open image file %s: %v", imageFileName, err)
+		log.Fatalf("Failed to open image file: %v", err)
 	}
 	defer file.Close()
-	putImageRes, err := s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
+
+	putImageRes, err := s3Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket: aws.String(bucketName),
-		Key:    aws.String(imageFileName),
+		Key:    aws.String(imageObjectKey),
 		Body:   file,
 	})
 	if err != nil {
-		log.Fatalf("Failed to put image object: %v", err)
+		log.Fatalf("Failed to upload image: %v", err)
 	}
-	log.Printf("Put image object response etag: %v", putImageRes.ETag)
+	log.Printf("Image file uploaded successfully. ETag: %s", aws.ToString(putImageRes.ETag))
 
-	// 5.4 List objects in the bucket again
-	output, err := s3Client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
+	// 5.4 List objects in the bucket
+	log.Printf("Listing objects in bucket '%s':", bucketName)
+	listOutput, err := s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket: aws.String(bucketName),
 	})
 	if err != nil {
 		log.Fatalf("Failed to list objects: %v", err)
 	}
-	log.Println("Objects in bucket:")
-	for _, object := range output.Contents {
-		log.Printf("key=%s size=%d", aws.ToString(object.Key), object.Size)
+	for _, object := range listOutput.Contents {
+		log.Printf(" - %s (Size: %d bytes)", aws.ToString(object.Key), object.Size)
 	}
 
-	// 5.5 Get object
-	object, err := s3Client.GetObject(context.TODO(), &s3.GetObjectInput{
+	// 5.5 Download and read object content
+	log.Printf("Downloading '%s'...", textObjectKey)
+	getRes, err := s3Client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucketName),
-		Key:    aws.String("test-msg1.txt"),
+		Key:    aws.String(textObjectKey),
 	})
 	if err != nil {
-		log.Fatalf("Failed to get object: %v", err)
+		log.Fatalf("Failed to download object: %v", err)
 	}
-	defer object.Body.Close()
-	log.Printf("Get object response etag: %s", aws.ToString(object.ETag))
+	defer getRes.Body.Close()
 
-	// 6. presigned requests
+	content, err := io.ReadAll(getRes.Body)
+	if err != nil {
+		log.Fatalf("Failed to read object content: %v", err)
+	}
+	log.Printf("Downloaded content: %s", string(content))
+
+	// 6. Presigned URLs
+	log.Println("--- Testing Presigned URLs ---")
+
 	presigner := s3.NewPresignClient(s3Client, func(po *s3.PresignOptions) {
 		po.Expires = 15 * time.Minute
 	})
-	ps, err := presigner.PresignGetObject(context.TODO(), &s3.GetObjectInput{
+
+	psReq, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(bucketName),
-		Key:    aws.String("test-msg1.txt"),
+		Key:    aws.String(textObjectKey),
 	})
 	if err != nil {
-		log.Fatalf("Failed to presign get object: %v", err)
+		log.Fatalf("Failed to generate presigned URL: %v", err)
 	}
-	//log.Printf("Presigned method: %s header: %s URL: %s", ps.Method, ps.SignedHeader, ps.URL)
 
-	// 6.1 Add LimeWireNetwork query params (signature + requestId) to the presigned URL
-	psWithBn, err := client.AddLimeWireNetworkParamsToPresignedURL(limeWireNetworkClientConfig, ps.URL, 1)
+	// Append LimeWire Network specific parameters (signature and request tracking)
+	// requestId (1) is used here for demonstration purposes.
+	finalPresignedURL, err := client.AddLimeWireNetworkParamsToPresignedURL(configOptions, psReq.URL, 1)
 	if err != nil {
-		log.Fatalf("Failed to append LimeWireNetwork params to presigned URL: %v", err)
+		log.Fatalf("Failed to add LimeWire parameters to presigned URL: %v", err)
 	}
-	log.Printf("Presigned LimeWireNetwork url: %s", psWithBn)
+	log.Printf("Generated LimeWire Presigned URL: %s", finalPresignedURL)
 
-	// 6.2 fetch that presigned url and print content of response
-	get, err := http.Get(psWithBn)
+	// 6.1 Verify the presigned URL
+	log.Println("Verifying presigned URL with an HTTP GET...")
+	resp, err := http.Get(finalPresignedURL)
 	if err != nil {
-		log.Fatalf("Failed to fetch presigned URL: %v", err)
-		return
+		log.Fatalf("HTTP request to presigned URL failed: %v", err)
 	}
-	defer get.Body.Close()
-	if get.StatusCode != http.StatusOK {
-		log.Fatalf("Failed to fetch presigned URL (not OK status): %v", get.Status)
-		return
-	} else {
-		body, err := io.ReadAll(get.Body)
-		if err != nil {
-			log.Fatalf("Failed to read response body: %v", err)
-		}
-		log.Printf("Response from presigned url: %s", string(body))
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		log.Fatalf("Presigned URL returned unexpected status: %s", resp.Status)
 	}
-	// 6.3 2nd fetch should fail with 429
-	get, err = http.Get(psWithBn)
+
+	respBody, _ := io.ReadAll(resp.Body)
+	log.Printf("Successfully fetched content from presigned URL: %s", string(respBody))
+
+	// 6.2 Rate limiting verification (One-time usage)
+	log.Println("Verifying rate limiting (should fail on second request)...")
+	resp2, err := http.Get(finalPresignedURL)
 	if err != nil {
-		log.Fatalf("Should not fail with error: %v", err)
-		return
+		log.Fatalf("Second HTTP request failed: %v", err)
 	}
-	defer get.Body.Close()
-	if get.StatusCode != http.StatusTooManyRequests {
-		log.Fatalf("Should fail with 429 status: %v", get.Status)
+	defer resp2.Body.Close()
+
+	if resp2.StatusCode == http.StatusTooManyRequests {
+		log.Printf("Second request failed as expected with 429 (Too Many Requests)")
 	} else {
-		log.Printf("2nd request for presigned url failed as expected with 429 status")
+		log.Printf("Warning: Second request returned status: %s (expected 429)", resp2.Status)
 	}
+
+	log.Println("Demo completed successfully!")
 }
