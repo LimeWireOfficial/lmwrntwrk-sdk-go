@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"hash"
 	"io"
 
 	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/internal/shared"
@@ -28,6 +29,10 @@ type FooterReader struct {
 	bufPos int
 	bufLen int
 
+	// New fields for deterministic chunking
+	chunkHasher  hash.Hash
+	bytesInChunk int
+
 	validatorPayload *ValidatorPayload
 }
 
@@ -45,6 +50,14 @@ type HashWithLength struct {
 func (r *FooterReader) Read(p []byte) (int, error) {
 	if r.eof {
 		if r.footer == nil {
+			// Finalize last chunk if needed before creating footer
+			if r.bytesInChunk > 0 {
+				sum := r.chunkHasher.Sum(nil)
+				r.hashes = append(r.hashes, HashWithLength{Hash: sum[:], Length: r.bytesInChunk})
+				r.chunkHasher.Reset()
+				r.bytesInChunk = 0
+			}
+
 			var err error
 			r.footer, r.validatorPayload, err = createFooter(r.hashes, r.total, r.signer)
 			if err != nil {
@@ -71,14 +84,29 @@ func (r *FooterReader) Read(p []byte) (int, error) {
 	n, err := r.body.Read(r.buf)
 	if n > 0 {
 		r.bufLen = n
-
-		chunk := r.buf[:n]
-		sum := sha256.Sum256(chunk)
-
-		r.hashes = append(r.hashes, HashWithLength{Hash: sum[:], Length: len(chunk)})
 		r.total += int64(n)
 
-		written := copy(p, chunk)
+		// Process deterministic chunks
+		data := r.buf[:n]
+		for len(data) > 0 {
+			space := r.chunkSize - r.bytesInChunk
+			if space > len(data) {
+				space = len(data)
+			}
+
+			r.chunkHasher.Write(data[:space])
+			r.bytesInChunk += space
+			data = data[space:]
+
+			if r.bytesInChunk == r.chunkSize {
+				sum := r.chunkHasher.Sum(nil)
+				r.hashes = append(r.hashes, HashWithLength{Hash: sum[:], Length: r.chunkSize})
+				r.chunkHasher.Reset()
+				r.bytesInChunk = 0
+			}
+		}
+
+		written := copy(p, r.buf[:n])
 		r.bufPos = written
 		return written, nil
 	}
@@ -94,10 +122,11 @@ func (r *FooterReader) Close() error { return r.body.Close() }
 // FooterAppendingReader returns a reader that appends a footer to the body.
 func FooterAppendingReader(body io.ReadCloser, opt FooterOptions) (*FooterReader, error) {
 	return &FooterReader{
-		body:      body,
-		chunkSize: opt.ChunkSize,
-		buf:       make([]byte, opt.ChunkSize),
-		signer:    opt.EcdsaSigner,
+		body:        body,
+		chunkSize:   opt.ChunkSize,
+		buf:         make([]byte, opt.ChunkSize),
+		signer:      opt.EcdsaSigner,
+		chunkHasher: sha256.New(),
 	}, nil
 }
 
