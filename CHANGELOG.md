@@ -1,3 +1,7 @@
+# Release (v0.1.3)
+- chore: improve docs and demo for easier onboarding
+- feat: resolve validators from theGraph
+
 # Release (v0.1.2)
 - feat: ensure deterministic chunking for footer creation
 
