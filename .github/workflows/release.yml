@@ -39,3 +39,12 @@ jobs:
 
       - name: Run Tests with Race Detector
         run: go test -v -race ./...
+
+      - name: Verify version matches git tag
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          SDK_VERSION=$(grep 'var SDKVersion =' internal/version/version.go | cut -d '"' -f 2)
+          if [ "$TAG_VERSION" != "$SDK_VERSION" ]; then
+            echo "Error: Git tag v$TAG_VERSION does not match SDKVersion $SDK_VERSION in internal/version/version.go"
+            exit 1
+          fi
