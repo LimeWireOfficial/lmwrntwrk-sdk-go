@@ -55,6 +55,7 @@ func TestSimplePut(t *testing.T) {
 	s3Headers := s3Request.Headers
 	assert.NotEmpty(t, s3Headers["X-Lmwrntwrk-Request-Id"])
 	assert.NotEmpty(t, s3Headers["X-Lmwrntwrk-Signature"])
+	assert.Contains(t, s3Headers.Get("User-Agent"), "LmwrNtwrkGoSdk/0.1.3")
 	assert.Equal(t, "109", s3Headers.Get("X-Lmwrntwrk-Footer-Length"))
 	assert.Equal(t, "10485760", s3Headers.Get("X-Lmwrntwrk-Chunk-Size"))
 	assert.Equal(t, "132", s3Headers.Get("Content-Length"))
@@ -70,6 +71,7 @@ func TestSimplePut(t *testing.T) {
 	validatorRequest := requestSpy.Requests[1]
 	assert.Equal(t, "POST", validatorRequest.Method)
 	assert.Equal(t, "/events", validatorRequest.Path)
+	assert.Equal(t, "LmwrNtwrkGoSdk/0.1.3", validatorRequest.Headers.Get("User-Agent"))
 
 	storeEventRequest := &StoreEventRequestJson{}
 	assert.NoError(t, json.Unmarshal(validatorRequest.Body, storeEventRequest))
@@ -170,6 +172,7 @@ func TestSimpleGet(t *testing.T) {
 	validatorRequest := requestSpy.Requests[1]
 	assert.Equal(t, "POST", validatorRequest.Method)
 	assert.Equal(t, "/events", validatorRequest.Path)
+	assert.Equal(t, "LmwrNtwrkGoSdk/0.1.3", validatorRequest.Headers.Get("User-Agent"))
 
 	storeEventRequest := &StoreEventRequestJson{}
 	assert.NoError(t, json.Unmarshal(validatorRequest.Body, storeEventRequest))
@@ -223,6 +226,7 @@ func TestCompleteMultipartUpload(t *testing.T) {
 	validatorRequest := requestSpy.Requests[1]
 	assert.Equal(t, "POST", validatorRequest.Method)
 	assert.Equal(t, "/events", validatorRequest.Path)
+	assert.Equal(t, "LmwrNtwrkGoSdk/0.1.3", validatorRequest.Headers.Get("User-Agent"))
 
 	storeEventRequest := &StoreEventRequestJson{}
 	assert.NoError(t, json.Unmarshal(validatorRequest.Body, storeEventRequest))
@@ -258,6 +262,7 @@ func TestHandleMultipleChunksProperly(t *testing.T) {
 	s3Headers := s3Request.Headers
 	assert.NotEmpty(t, s3Headers["X-Lmwrntwrk-Request-Id"])
 	assert.NotEmpty(t, s3Headers["X-Lmwrntwrk-Signature"])
+	assert.Contains(t, s3Headers.Get("User-Agent"), "LmwrNtwrkGoSdk/0.1.3")
 	assert.Equal(t, "109", s3Headers.Get("X-Lmwrntwrk-Footer-Length"))
 	assert.Equal(t, "10485760", s3Headers.Get("X-Lmwrntwrk-Chunk-Size"))
 	assert.Equal(t, "15000109", s3Headers.Get("Content-Length"))

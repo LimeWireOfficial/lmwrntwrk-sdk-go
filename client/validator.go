@@ -11,6 +11,8 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/internal/version"
 )
 
 func generatePayload(
@@ -102,6 +104,7 @@ func sendDataToValidator(context context.Context, validatorData []byte, validato
 	}
 
 	client := &http.Client{Transport: rt.Transport}
+	req.Header.Set("User-Agent", version.UserAgent())
 	if _, err := client.Do(req); err != nil {
 		slog.Warn("Failed to send validatorData", "error", err)
 	} else {

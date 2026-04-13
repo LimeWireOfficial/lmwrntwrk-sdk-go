@@ -12,6 +12,7 @@ import (
 	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/allowlist"
 	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/graph"
 	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/internal/shared"
+	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/internal/version"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -84,6 +85,7 @@ type eCDSARoundTripper struct {
 	signer               *ecdsaSigner
 	ChunkSize            int // size of chunks for a building hash list in the footer
 	ValidatorUrlResolver ValidatorUrlResolver
+	sdkUserAgent         string
 }
 
 func (cfg *Config) GetPrivateKey() (string, error) {
@@ -138,6 +140,7 @@ func newECDSARoundTripper(cfg Config) (*eCDSARoundTripper, error) {
 		signer:               signer,
 		ChunkSize:            cfg.ChunkSize,
 		ValidatorUrlResolver: validatorUrlResolver,
+		sdkUserAgent:         version.UserAgent(),
 	}, nil
 }
 
@@ -172,6 +175,14 @@ func (rt *eCDSARoundTripper) RoundTrip(incomingReq *http.Request) (*http.Respons
 
 	incomingReq.Header.Set(SignatureHeader, sig)
 	incomingReq.Header.Set(RequestIdHeader, requestIdString)
+
+	userAgent := incomingReq.Header.Get("User-Agent")
+	if userAgent != "" {
+		userAgent = fmt.Sprintf("%s %s", userAgent, rt.sdkUserAgent)
+	} else {
+		userAgent = rt.sdkUserAgent
+	}
+	incomingReq.Header.Set("User-Agent", userAgent)
 
 	isRequestRecordingNeeded := s3Action == "s3:CompleteMultipartUpload" || s3Action == "s3:PutObjectTagging"
 

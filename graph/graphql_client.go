@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"github.com/LimeWireOfficial/lmwrntwrk-sdk-go/internal/version"
 )
 
 const DefaultGraphEndpoint = "https://graph.limewire.network/subgraphs/name/lmwrntwrk-v1"
@@ -97,6 +99,7 @@ func (c *GraphQLClient) query(ctx context.Context, query string, variables map[s
 		return fmt.Errorf("failed to build request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("User-Agent", version.UserAgent())
 	if c.Bearer != "" {
 		req.Header.Set("Authorization", "Bearer "+c.Bearer)
 	}

@@ -11,6 +11,11 @@ import (
 
 func TestGraphQLGetBucketDetails(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userAgent := r.Header.Get("User-Agent")
+		if userAgent != "LmwrNtwrkGoSdk/0.1.3" {
+			t.Errorf("unexpected User-Agent: %s", userAgent)
+		}
+
 		resp := GraphQLResponse{
 			Data: json.RawMessage(`{
 				"buckets": [{
