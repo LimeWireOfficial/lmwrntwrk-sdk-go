@@ -236,6 +236,27 @@ func TestCompleteMultipartUpload(t *testing.T) {
 	assert.NotNil(t, storeEventRequest.Footer)
 }
 
+func TestListObjectsDoesNotSendToValidator(t *testing.T) {
+	requestSpy := &RequestSpy{}
+
+	server := startMockServer(requestSpy)
+	defer server.Close()
+
+	s3Client, err := createClient(t, server)
+	assert.NoError(t, err)
+
+	result, err := s3Client.ListObjectsV2(context.TODO(), &s3.ListObjectsV2Input{
+		Bucket: aws.String("bucket"),
+	})
+
+	assert.NoError(t, err)
+	assert.NotNil(t, result)
+
+	// Should only have 1 request (to S3), and NOT 2 (the second one would be to validator)
+	assert.Len(t, requestSpy.Requests, 1)
+	assert.Equal(t, "GET", requestSpy.Requests[0].Method)
+}
+
 func TestHandleMultipleChunksProperly(t *testing.T) {
 	requestSpy := &RequestSpy{}
 

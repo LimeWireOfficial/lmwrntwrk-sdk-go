@@ -212,13 +212,15 @@ func (rt *eCDSARoundTripper) RoundTrip(incomingReq *http.Request) (*http.Respons
 		return nil, fmt.Errorf("round trip: %w", err)
 	}
 
-	if validatorPayload := generatePayload(incomingReq, response, wrappedRequestBody.GetBufferedData(), footerAppendingReader.validatorPayload, s3Action); validatorPayload != nil {
-		validatorUrl, err := rt.ValidatorUrlResolver()
-		if err != nil {
-			slog.Error("Failed to resolve validator url, not sending event", "error", err)
-		}
+	if allowlist.IsValidatorActionAllowed(s3Action) {
+		if validatorPayload := generatePayload(incomingReq, response, wrappedRequestBody.GetBufferedData(), footerAppendingReader.validatorPayload, s3Action); validatorPayload != nil {
+			validatorUrl, err := rt.ValidatorUrlResolver()
+			if err != nil {
+				slog.Error("Failed to resolve validator url, not sending event", "error", err)
+			}
 
-		sendDataToValidator(incomingReq.Context(), validatorPayload, validatorUrl, rt)
+			sendDataToValidator(incomingReq.Context(), validatorPayload, validatorUrl, rt)
+		}
 	}
 
 	return response, nil

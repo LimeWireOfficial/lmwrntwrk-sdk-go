@@ -15,9 +15,11 @@ import (
 
 // Package-level immutable data initialized once from embedded JSON.
 var (
-	once       sync.Once
-	allowedSet map[string]struct{}
-	initErr    error
+	once             sync.Once
+	allowedSet       map[string]struct{}
+	validatorAllowed map[string]struct{}
+	initErr          error
+	validatorInitErr error
 )
 
 // allowed reports whether the action is allowed by the embedded policy.
@@ -40,6 +42,16 @@ func AllowedRequest(r *http.Request) bool {
 
 func IsActionAllowed(action string) bool {
 	return allowed(action)
+}
+
+// IsValidatorActionAllowed reports whether the action is whitelisted for the validator nodes.
+func IsValidatorActionAllowed(action string) bool {
+	initialize()
+	if initErr != nil {
+		return false
+	}
+	_, ok := validatorAllowed[action]
+	return ok
 }
 
 // GetS3ActionFromRequest maps an HTTP request to the closest S3 action name.
@@ -220,8 +232,10 @@ func GetS3ActionFromRequest(r *http.Request) string {
 func initialize() {
 	once.Do(func() {
 		var fs struct {
-			Actions     []string `json:"actions"`
-			Description string   `json:"description"`
+			Actions                     []string `json:"actions"`
+			ValidatorActions            []string `json:"validatorActions"`
+			ActionsDescription          string   `json:"actionsDescription"`
+			ValidatorActionsDescription string   `json:"validatorActionsDescription"`
 		}
 		dec := json.NewDecoder(strings.NewReader(string(actionsJSON)))
 		dec.DisallowUnknownFields()
@@ -244,5 +258,18 @@ func initialize() {
 			return
 		}
 		allowedSet = m
+
+		vm := make(map[string]struct{}, len(fs.ValidatorActions))
+		for _, act := range fs.ValidatorActions {
+			act = strings.TrimSpace(act)
+			if act == "" {
+				continue
+			}
+			vm[act] = struct{}{}
+		}
+		if len(vm) == 0 {
+			log.Printf("allowlist: no valid validator actions in embedded actions.json")
+		}
+		validatorAllowed = vm
 	})
 }

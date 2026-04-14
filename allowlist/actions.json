@@ -1,5 +1,5 @@
 {
-  "description": "S3 actions allowed for the LimeWireNetwork Storage Provider, composed from allowed permissions https://docs.min.io/enterprise/aistor-object-store/administration/iam/access/#common-s3-operations and official s3 actions https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations_Amazon_Simple_Storage_Service.html",
+  "actionsDescription": "S3 actions allowed for the LimeWireNetwork Storage Provider, composed from allowed permissions https://docs.min.io/enterprise/aistor-object-store/administration/iam/access/#common-s3-operations and official s3 actions https://docs.aws.amazon.com/AmazonS3/latest/API/API_Operations_Amazon_Simple_Storage_Service.html",
   "actions": [
     "s3:AbortMultipartUpload",
     "s3:CompleteMultipartUpload",
@@ -24,6 +24,22 @@
     "s3:ListObjects",
     "s3:ListObjectsV2",
     "s3:ListParts",
+    "s3:PutBucketTagging",
+    "s3:PutObject",
+    "s3:PutObjectTagging",
+    "s3:UploadPart",
+    "s3:UploadPartCopy"
+  ],
+  "validatorActionsDescription": "S3 actions allowed to be sent to the validator nodes. These are a subset of the general allowed actions.",
+  "validatorActions": [
+    "s3:AbortMultipartUpload",
+    "s3:CompleteMultipartUpload",
+    "s3:CopyObject",
+    "s3:CreateMultipartUpload",
+    "s3:DeleteObject",
+    "s3:DeleteObjects",
+    "s3:DeleteObjectTagging",
+    "s3:GetObject",
     "s3:PutBucketTagging",
     "s3:PutObject",
     "s3:PutObjectTagging",
