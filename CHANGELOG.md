@@ -1,3 +1,8 @@
+# Release (v0.1.4)
+- feat: event whitelist to send to validator nodes from the SDK
+- chore: verify sdk version matches git tag
+- feat: augment "user-agent" header with sdk version
+
 # Release (v0.1.3)
 - chore: improve docs and demo for easier onboarding
 - feat: resolve validators from theGraph
