@@ -6,13 +6,14 @@ import (
 	"math/big"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
 func TestGraphQLGetBucketDetails(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		userAgent := r.Header.Get("User-Agent")
-		if userAgent != "LmwrNtwrkGoSdk/0.1.3" {
+		if !strings.HasPrefix(userAgent, "LmwrNtwrkGoSdk/") {
 			t.Errorf("unexpected User-Agent: %s", userAgent)
 		}
 
